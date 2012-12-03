@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<style>*{margin:0;padding:0;border:0;overflow:hidden;background-color:black}</style>
+<script>
+
+var vector2 = function(x_, y_) {
+  this.x = x_ ? x_ : 0;
+  this.y = y_ ? y_ : 0;
+};
+vector2.prototype = {
+  to_screen_coordinates: function(){
+    return new vector2(
+      tmp.screen_translation.x + this.x,
+      tmp.screen_translation.y - this.y
+    );
+  }
+};
+
+var conf = {
+  auto_fullscreen   : true,
+  screen_resolution : new vector2(1920, 1080),
+  space_resolution  : new vector2(160, 90),
+  force_gravity     : true,
+  c_gravity         : 9.80665,
+  c_wall_friction   : 0.8,
+  c_luminance       : 3,
+  c_radius_enhancement : 32,
+  present_fps       : true,
+  present_score     : true,
+  present_particles : false,
+  present_pixels    : true,  num_of_fps_data   : Math.pow(2, 8),
+  score_time        : 128 * 1000,
+  num_of_initial_particles : Math.pow(2, 8),
+  initial_particle_pattern : 'arc_shoot', // arc_shoot fall_sequencial random
+  main_loop_timer_time : 100,
+  score_timer_time     : 1000,
+  generator_timer_time : 25,
+  particle_mass        : 10,
+  particle_radius      : 40,
+  bgm                  : 'http://www.tam-music.com/ogg/abcdef/tam-x04_loop.ogg'
+};
+
+var tmp = {
+  main_loop_lastcall_time: null,
+  particles              : null,
+  fps_data               : null,
+  last_fps               : null,
+  score                  : null,
+  score_fixed            : null,
+  info_text_buffer       : null,
+  timer_main_loop_id     : null,
+  timer_score_id         : null,
+  timer_generator_id     : null,
+  begin_time             : null,
+  screen_translation     : null,
+  pixels                 : null,
+  pixel_size             : null,
+};
+
+var particle = function(mass_, radius_, color_, position_, velocity_) {
+  this.mass     = mass_ ? mass_ : 1;
+  this.radius   = radius_ ? radius_ : 1;
+  this.color    = color_ ? color_ : new color();
+  this.position = position_ ? position_ : new vector2();
+  this.velocity = velocity_ ? velocity_ : new vector2();
+};
+particle.prototype = {
+  update: function(dt){
+    var dt_sec = dt * 0.001;
+    if(conf.force_gravity) {
+      this.velocity.y -= dt_sec * conf.c_gravity;
+    }
+    var b = tmp.screen_translation;
+    this.position.x += this.velocity.x * dt_sec;
+    this.position.y += this.velocity.y * dt_sec;
+    var abs_px = Math.abs(this.position.x);
+    if(abs_px > b.x) {
+      this.position.x -= (abs_px - b.x) * this.position.x / abs_px; 
+      this.velocity.x *= -conf.c_wall_friction;
+    }
+    var abs_py = Math.abs(this.position.y);
+    if(abs_py > b.y) {
+      this.position.y -= (abs_py - b.y) * this.position.y / abs_py; 
+      this.velocity.y *= -conf.c_wall_friction;
+    }
+  }
+};
+
+var color = function(r_, g_, b_, a_) {
+  this.r = r_ ? r_ : 0; // unorm
+  this.g = g_ ? g_ : 0; // unorm
+  this.b = b_ ? b_ : 0; // unorm
+  this.a = a_ ? a_ : 1; // unorm
+};
+color.prototype = {
+  c_unorm_to_byte: 255,
+  to_css_rgb: function(){
+    return 'rgb('
+      + (this.r * this.c_unorm_to_byte).toFixed(0) + ','
+      + (this.g * this.c_unorm_to_byte).toFixed(0) + ','
+      + (this.b * this.c_unorm_to_byte).toFixed(0) + ')'
+    ;
+  },
+  clear: function(){
+    this.r = this.g = this.b = 0;
+    this.a = 1;
+  },
+};
+color.from_HSL = function(h, s, l){
+  var p_p_2 = Math.PI * 2;
+  var p_d_3 = Math.PI / 3;
+  var p_p_2_d_3 = Math.PI * 2 / 3;
+  var p_p_4_d_3 = p_p_2_d_3 * 2;
+  
+  while(h < 0)
+    h += p_p_2;
+  while(p_p_2 < h)
+    h -= p_p_2;
+  
+  if(s === 0)
+    return new color(l, l, l);
+  
+  var m2 = (l < 0.5) ? l * (1 + s) : l + s - l * s;
+  var m1 = l * 2 - m2;
+  
+  var f = function(tmp){
+    if(tmp < p_d_3)
+      return (m1 + (m2 - m1) * tmp / p_d_3);
+    else if(tmp < Math.PI)
+      return m2;
+    else if(tmp < p_p_4_d_3)
+      return m1 + (m2 -m1) * (p_p_4_d_3 - tmp) / p_d_3;
+    else
+      return m1;
+  };
+  
+  var hr = h + p_p_2_d_3;
+  if(p_p_2 < hr)
+    hr -= p_p_2;
+  var hb = h - p_p_2_d_3;
+  if(hb < 0)
+    hb += p_p_2;
+  return new color(f(hr), f(h), f(hb));
+};
+
+function update_clear() {
+  tmp.info_text_buffer = [
+    'C++ Advent Calendar 2012 / 4th day : Native-client vs. HTML5',
+    ' by Usagi Ito, BGM by TAM Music Factory. Thanks.',
+    '',
+  ];
+}
+
+function update_fps(dt) {
+  var data = tmp.fps_data;
+  data.shift();
+  data.push(1000/dt);
+  var average = 0;
+  for(var i in data)
+    average += data[i];
+  tmp.last_fps = average /= data.length;
+  tmp.info_text_buffer.push('FPS: ' + average.toFixed(3));
+}
+
+function update_score() {
+  var t = 'SCORE: ' + tmp.score.toFixed(0) + ' ';
+  if(tmp.score_fixed)
+    t += '(RESULT FIXED!)';
+  else{
+    var last = Math.max(0, conf.score_time - (new Date() - tmp.begin_time));
+    t += '(LAST ' + last + ' [ms])'
+  }
+  tmp.info_text_buffer.push(t);
+}
+
+function update_particles(dt) {
+  var ps = tmp.particles;
+  for(var i in ps) {
+    var p = ps[i];
+    p.update(dt);
+    update_particles_pixels(p);
+  }
+};
+
+function update_particles_pixels(p) {
+  var pps = p.position.to_screen_coordinates();
+  var px = pps.x;
+  var py = pps.y;
+  var pr = p.radius;
+  var prn= pr * conf.c_radius_enhancement;
+  var pc = p.color;
+  var w  = tmp.pixel_size.x;
+  var h  = tmp.pixel_size.y;
+  var wd2= w * 0.5;
+  var hd2= h * 0.5;
+  var pixels = [];
+  for(var i = 0; i < conf.space_resolution.x; ++i) {
+  //for(var x = px - prn; x < px + prn; x += w) {
+  //  if(x < 0 || conf.screen_resolution.x < x)
+  //    continue;
+  //  var i = Math.floor(x/w);
+    for(var j = 0; j < conf.space_resolution.y; ++j) {
+    //for(var y = py - prn; y < py + prn; y += h) {
+    //  if(y < 0 || conf.screen_resolution.y < y)
+    //    continue;
+    //  var j = Math.floor(y/h);
+      var dx = (i * w + wd2) - px;
+      var dy = (j * h + hd2) - py;
+      var d = Math.sqrt(dx*dx+dy*dy);
+      //if(d > prn)
+      //  continue;
+      var k = conf.c_luminance / (d + 1)
+      var pixel = tmp.pixels[i][j];
+      pixel.r += pc.r * k;
+      pixel.g += pc.g * k;
+      pixel.b += pc.b * k;
+    }
+  }
+};
+
+function update_clear_pixels() {
+  for(var i in tmp.pixels)
+    for(var j in tmp.pixels[i])
+      tmp.pixels[i][j].clear();
+}
+
+function present_info() {
+  var c = tmp.context;
+  c.font        = '20px monospace';
+  c.fillStyle   = 'gray';
+  var b = tmp.info_text_buffer;
+  var w = conf.screen_resolution.x - 20;
+  for(var i in b){
+    var y = 40 + 20 * i;
+    c.fillText  (b[i] + '\n', 20, y, w);
+  }
+}
+
+function present_pixels() {
+  var c = tmp.context;
+  var ps = tmp.pixels;
+  var w = tmp.pixel_size.x;
+  var h = tmp.pixel_size.y;
+  for(var i in ps){
+    var x = i * w;
+    for(var j in ps[i]){
+      var y = j * h;
+      c.fillStyle = ps[i][j].to_css_rgb();
+      c.fillRect(x, y, w, h);
+    }
+  }
+}
+
+function present_particles() {
+  var ps = tmp.particles;
+  var c  = tmp.context;
+  for(var i in ps){
+    var p  = ps[i];
+    var pr = p.radius;
+    var pp = p.position.to_screen_coordinates();
+    c.strokeStyle = p.color.to_css_rgb();
+    c.beginPath();
+    c.arc(
+      pp.x,
+      pp.y,
+      pr,
+      0, Math.PI * 2
+    );
+    c.stroke();
+  }
+}
+
+function present_clear() {
+  tmp.context.clearRect(
+    0, 0,
+    conf.screen_resolution.x,
+    conf.screen_resolution.y
+  );
+}
+
+function present() {
+  present_clear();
+  if(conf.present_pixels)
+    present_pixels();
+  if(conf.present_particles)
+    present_particles();
+  present_info();
+}
+
+function update(dt) {
+  update_clear();
+  if(conf.present_score)
+    update_score();
+  if(conf.present_fps)
+    update_fps(dt);
+  update_clear_pixels();
+  update_particles(dt);
+  present();
+}
+
+function main_loop() {
+  var now = new Date();
+  var dt  = now - tmp.main_loop_lastcall_time;
+  tmp.main_loop_lastcall_time = now;
+  update(dt);
+}
+
+function score() {
+  tmp.score += tmp.last_fps;
+  if(new Date() - tmp.begin_time > conf.score_time){
+    clearInterval(tmp.timer_score_id);
+    tmp.score_fixed = true;
+  }
+}
+
+function generate_initial_pixels() {
+  var ps = tmp.pixels = [];
+  for(var n = 0; n < conf.space_resolution.x; ++n){
+    ps.push([]);
+    for(var m = conf.space_resolution.y; m; --m)
+      ps[n].push(new color());
+  }
+}
+
+function generate_initial_particles() {
+  var ps = tmp.particles = [];
+  switch(conf.initial_particle_pattern){
+  default:
+  case 'arc_shoot':
+    tmp.timer_generator_id = setInterval(function(){
+      var r = tmp.particles.length / conf.num_of_initial_particles;
+      var t = Math.PI * 2 * r;
+      var tr = t * 7;
+      var v0 = 128;
+      ps.push(
+        new particle(
+          conf.particle_mass,   // mass
+          conf.particle_radius, // radius
+          color.from_HSL(t, 1.0, 0.5), // color
+          new vector2(0, 0), // position
+          new vector2(
+            Math.cos(tr) * v0,
+            Math.sin(tr) * v0
+          )  // velocity
+        )
+      );
+      if(tmp.particles.length >= conf.num_of_initial_particles) {
+        clearInterval(tmp.timer_generator_id);
+        tmp.generator_timer_id = null;
+      }
+    }, conf.generator_timer_time);
+    //for(var n = conf.num_of_initial_particles; n; --n)
+    break;
+  }
+}
+
+function initialize() {
+  if(conf.bgm){
+    var a = tmp.audio = document.createElement('audio');
+    document.body.appendChild(a);
+    a.src = conf.bgm;
+    a.play();
+  }
+  var c = tmp.canvas = document.createElement('canvas');
+  document.body.appendChild(c);
+  c.setAttribute('width' , conf.screen_resolution.x);
+  c.setAttribute('height', conf.screen_resolution.y);
+  tmp.context     = c.getContext('2d');
+  tmp.last_fps    = 0;
+  tmp.fps_data    = [];
+  tmp.score       = 0;
+  tmp.score_fixed = false;
+  for(var n = conf.num_of_fps_data; n; --n)
+    tmp.fps_data.push(0);
+  if(conf.present_score)
+  if(conf.auto_fullscreen){
+    c.requestFullScreen
+      =  c.requestFullScreen
+      || c.webkitRequestFullScreen
+      || c.mozRequestFullScreen
+      || c.ieRequestFullScreen
+    ;
+    if(c.requestFullScreen)
+      c.requestFullScreen();
+  }
+  tmp.screen_translation = new vector2(
+    conf.screen_resolution.x >> 1,
+    conf.screen_resolution.y >> 1
+  );
+  generate_initial_particles();
+  generate_initial_pixels();
+  tmp.pixel_size = new vector2(
+    conf.screen_resolution.x / conf.space_resolution.x,
+    conf.screen_resolution.y / conf.space_resolution.y
+  );
+  tmp.begin_time = tmp.main_loop_lastcall_time = new Date();
+}
+
+function main() {
+  initialize();
+  tmp.timer_main_loop_id = setInterval(main_loop, conf.main_loop_timer_time);
+  tmp.timer_score_id     = setInterval(score,     conf.score_timer_time);
+}
+
+window.addEventListener('load', main);
+
+</script>
