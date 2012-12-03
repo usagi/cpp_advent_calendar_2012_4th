@@ -359,7 +359,10 @@ function initialize() {
     var a = tmp.audio = document.createElement('audio');
     document.body.appendChild(a);
     a.src = conf.bgm;
-    a.play();
+    if(a.play)
+      a.play();
+    else
+      console.log('[WARNING] Audio is n/a on your Environment. it cannot play BGM.');
   }
   var c = tmp.canvas = document.createElement('canvas');
   document.body.appendChild(c);
