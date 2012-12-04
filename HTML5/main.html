@@ -32,8 +32,9 @@ var conf = {
   score_time        : 128 * 1000,
   num_of_initial_particles : Math.pow(2, 8),
   initial_particle_pattern : 'arc_shoot', // arc_shoot fall_sequencial random
-  main_loop_timer_time : 100,
+  main_loop_timer_time : 1,
   score_timer_time     : 1000,
+  main_loop_is_timeout : true,
   generator_timer_time : 25,
   particle_mass        : 10,
   particle_radius      : 40,
@@ -303,6 +304,8 @@ function main_loop() {
   var dt  = now - tmp.main_loop_lastcall_time;
   tmp.main_loop_lastcall_time = now;
   update(dt);
+  if(conf.main_loop_is_timeout)
+    setTimeout(arguments.callee, conf.main_loop_timer_time);
 }
 
 function score() {
@@ -401,7 +404,10 @@ function initialize() {
 
 function main() {
   initialize();
-  tmp.timer_main_loop_id = setInterval(main_loop, conf.main_loop_timer_time);
+  if(conf.main_loop_is_timeout)
+    setTimeout(main_loop, conf.main_loop_timer_time);
+  else
+    tmp.timer_main_loop_id = setInterval(main_loop, conf.main_loop_timer_time);
   tmp.timer_score_id     = setInterval(score,     conf.score_timer_time);
 }
 
