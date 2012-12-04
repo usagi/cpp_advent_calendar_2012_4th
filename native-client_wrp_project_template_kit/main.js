@@ -165,8 +165,6 @@ var initialize = function(){
     var m0 = Math.min(window.innerWidth, window.innerHeight);
     var m1 = Math.min(14, m0 * 0.02);
     var m2 = Math.min(14, m0 * 0.023);
-    document.getElementById('global_header').style.fontSize = m2 + 'px';
-    document.getElementById('global_footer').style.fontSize = m1 + 'px';
     wrp.log_pop();
   };
   window.addEventListener('resize', css_fix_size, true);
