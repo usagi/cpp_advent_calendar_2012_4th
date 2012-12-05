@@ -269,7 +269,6 @@ var main = function(){
   };
   n.load_end = function(){
     indicate('LOADING', 'DONE', 'center', 0);
-    C
     if(tmp.audio.play)
       tmp.audio.play();
     else

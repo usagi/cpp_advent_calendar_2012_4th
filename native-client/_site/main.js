@@ -188,6 +188,10 @@ var main = function(){
   var a = tmp.audio = document.createElement('audio');
   document.body.appendChild(a);
   a.src = "../../music/tam-x04.mp3";
+  if(a.play)
+    a.play();
+  else
+    console.log('[WARNING] Audio is n/a on your Environment. it cannot play BGM.');
   
   var indicate = function(k, v, va, o){
     wrp.log_push('indicate',this);
@@ -269,11 +273,6 @@ var main = function(){
   };
   n.load_end = function(){
     indicate('LOADING', 'DONE', 'center', 0);
-    C
-    if(tmp.audio.play)
-      tmp.audio.play();
-    else
-      console.log('[WARNING] Audio is n/a on your Environment. it cannot play BGM.');
     tmp.begin_time = tmp.main_loop_lastcall_time = new Date();
     tmp.n.post_message("update");
     tmp.timer_score_id = setInterval(function(){
