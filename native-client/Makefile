@@ -18,7 +18,7 @@ CXXFLAGS:=$(CXXTHREAD) $(CXXSTD) $(CXXOPTIMIZE) $(CXXWARNINGS) $(CXXPPAPI) $(CXX
 
 CXX:=$(TC_PATH)/bin/i686-nacl-g++
 
-DESTINATION   :=_site
+DESTINATION   :=demo
 
 REMOTE_DEPLOY_COMMAND:=rsync -av --delete
 REMOTE_DEPLOY_TEST   :=$(APP_NAME).WonderRabbitProject.net:/srv/http/WonderRabbitProject.net/$(APP_NAME)/test

@@ -159,8 +159,27 @@ wrp.nacl = (function(){
   return wrp_nacl;
 })();
 
+// global conf
+var conf = {
+  screen_resolution: { x: 1920, y: 1080 },
+  world_resolution: { x: 160, y: 90},
+};
+
 // global tmp
 var tmp = {};
+
+var debug_commands = {
+  change_resolution: function(sx,sy,wx,wy){
+    conf.screen_resolution.x = sx;
+    conf.screen_resolution.y = sy;
+    conf.world_resolution.x = wx;
+    conf.world_resolution.y = wy;
+    tmp.n.post_message(JSON.stringify({
+      command: 'change_resolution',
+      params: [sx,sy,wx,wy]
+    }));
+  },
+};
 
 var initialize = function(){
   var css_fix_size = function(){
@@ -182,8 +201,8 @@ var main = function(){
   var c = tmp.canvas = document.createElement('canvas');
   document.body.appendChild(c);
   tmp.context = c.getContext('2d');
-  c.setAttribute('width', 1920);
-  c.setAttribute('height', 1080);
+  c.setAttribute('width' , conf.screen_resolution.x);
+  c.setAttribute('height', conf.screen_resolution.y);
   
   var a = tmp.audio = document.createElement('audio');
   document.body.appendChild(a);
@@ -220,10 +239,10 @@ var main = function(){
       var dt  = now - tmp.main_loop_lastcall_time;
       tmp.main_loop_lastcall_time = now;
       var c = tmp.context;
-      var rx = 160;
-      var ry =  90;
-      var w = 1920 / rx;
-      var h = 1080 / ry;
+      var rx = conf.world_resolution.x;
+      var ry = conf.world_resolution.y;
+      var w = conf.screen_resolution.x / rx;
+      var h = conf.screen_resolution.y / ry;
       for(var i in m.data){
         var p = m.data[i];
         var y = (i % ry) * h;
@@ -256,12 +275,14 @@ var main = function(){
       c.font        = '20px monospace';
       c.fillStyle   = 'gray';
       var b = tmp.info_text_buffer;
-      var w = 1920 - 20;
+      var w = conf.screen_resolution.x - 20;
       for(var i in b){
         var y = 40 + 20 * i;
         c.fillText  (b[i] + '\n', 20, y, w);
       }
-      tmp.n.post_message("update");
+      tmp.n.post_message(JSON.stringify({
+        command: 'update'
+      }));
     }
   };
   n.load_start = function(){
@@ -269,13 +290,21 @@ var main = function(){
   };
   n.load_end = function(){
     indicate('LOADING', 'DONE', 'center', 0);
-    C
     if(tmp.audio.play)
       tmp.audio.play();
     else
       console.log('[WARNING] Audio is n/a on your Environment. it cannot play BGM.');
     tmp.begin_time = tmp.main_loop_lastcall_time = new Date();
-    tmp.n.post_message("update");
+    tmp.n.post_message(JSON.stringify({
+      command: 'change_resolution',
+      params : [
+        conf.screen_resolution.x, conf.screen_resolution.y,
+        conf.world_resolution.x, conf.world_resolution.y
+      ]
+    }));
+    tmp.n.post_message(JSON.stringify({
+      command: 'update'
+    }));
     tmp.timer_score_id = setInterval(function(){
       tmp.score += tmp.last_fps;
       if(new Date() - tmp.begin_time > 128000){
