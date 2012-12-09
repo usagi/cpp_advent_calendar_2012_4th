@@ -4,7 +4,14 @@
 
 #include <iostream>
 
-int main(){
+int main(int ac, char** av){
+
+  if(ac < 2){
+    std::cerr << "Usage: " << av[0] << " num_of_loop\n";
+    return -1;
+  }
+
+  const size_t num_of_loop = std::atoi(av[1]);
   
   using WonderRabbitProject::particle_system_tester::particle_system;
 
@@ -13,7 +20,7 @@ int main(){
     { 160,   90}
   );
 
-  for(size_t c = 0; c < 1000; ++c){
+  for(size_t c = 0; c < num_of_loop; ++c){
     std::cout << c << std::endl << "\x1b[1A";
     ps.update();
   }
