@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cmath>
 #include <boost/foreach.hpp>
 #include <boost/math/constants/constants.hpp>
@@ -92,18 +93,29 @@ public:
       return m1;
     }
   };
-  
+
   struct vector2: private boost::operators<vector2> {
     double x, y;
-    
+
+
     vector2(): x(.0), y(.0) {}
     
     vector2(double&& x_, double&& y_)
       : x(std::move(x_)), y(std::move(y_)) { }
     
+    // vector2(const vector2&) = default;
+    vector2(const vector2& v): x(v.x), y(v.y) { }
+
     vector2(vector2&& v)
       : x(std::move(v.x)), y(std::move(v.y)) { }
-    
+
+    // vector2& operator=(const vector2&) = default;
+    vector2& operator=(const vector2& v)
+    { x = v.x; y = v.y; return *this; }
+
+    vector2& operator=(vector2&& v)
+    { x = std::move(v.x); y = std::move(v.y); return *this; }
+
     vector2& operator+=(const vector2& t)
     { x += t.x; y += t.y; return *this; }
     
@@ -206,7 +218,7 @@ private:
   
   decltype(std::chrono::system_clock::now()) last_update_time;
   
-  vector2 to_screen_coordinates(vector2&& v){
+  vector2 to_screen_coordinates(const vector2& v){
     return {
       screen_translation.x + v.x,
       screen_translation.y - v.y
@@ -308,7 +320,7 @@ public:
   const pixels_type& get_pixels() const{
     return pixels;
   }
-  const double get_total_time_elapsed() const{
+  double get_total_time_elapsed() const{
     return total_time_elapsed;
   }
 };
